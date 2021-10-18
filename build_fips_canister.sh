@@ -2,4 +2,6 @@
 
 set -euo pipefail
 
-sudo docker build . -t fips-canister
+echo "Building the canister..."
+sudo docker build -t fips-canister -f Dockerfile.canister .
+echo "Building the canister: OK"
