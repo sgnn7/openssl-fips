@@ -10,10 +10,10 @@ ARG OPENSSL_VER=1.0.2o
 
 WORKDIR /
 
-RUN apt update && \
-    apt install -y gcc \
-                   make \
-                   wget
+RUN apt update -q && \
+    apt install -qy gcc \
+                    make \
+                    wget
 
 RUN wget --quiet "https://github.com/oracle/solaris-openssl-fips/releases/download/v1.0/${OPENSSL_FIPS_MODULE_FILENAME}" && \
     bash -ec "set -euo pipefail; \
