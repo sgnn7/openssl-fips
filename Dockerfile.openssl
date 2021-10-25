@@ -1,8 +1,8 @@
 FROM docker.io/ubuntu:20.04
 
-ARG OPENSSL_VER="1.0.2u"
-ARG OPENSSL_FILENAME="openssl-${OPENSSL_VER}.tar.gz"
+ENV OPENSSL_VER="1.0.2u"
 ENV OPENSSL_SHA256="ecd0c6ffb493dd06707d38b14bb4d8c2288bb7033735606569d8f90f89669d16"
+ENV OPENSSL_FILENAME="openssl-${OPENSSL_VER}.tar.gz"
 
 WORKDIR /
 
@@ -15,10 +15,9 @@ RUN apt update -q && \
 
 RUN wget --quiet "https://www.openssl.org/source/${OPENSSL_FILENAME}" && \
     bash -ec "set -euo pipefail; \
-        echo '${OPENSSL_SHA256}  ${OPENSSL_FILENAME}' > "${OPENSSL_FILENAME}.sha256" && \
-        if ! sha256sum -c "${OPENSSL_FILENAME}.sha256"; then echo 'Chacksum mismatch!'; exit 1; fi;"
-
-RUN tar -xzf "${OPENSSL_FILENAME}"
+        echo '${OPENSSL_SHA256}  ${OPENSSL_FILENAME}' > '${OPENSSL_FILENAME}.sha256' && \
+        if ! sha256sum -c '${OPENSSL_FILENAME}.sha256'; then echo 'Checksum mismatch!'; exit 1; fi;" && \
+    tar -xzf "${OPENSSL_FILENAME}"
 
 WORKDIR "openssl-${OPENSSL_VER}"
 
