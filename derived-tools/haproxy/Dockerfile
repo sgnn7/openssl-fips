@@ -17,6 +17,7 @@ RUN apt update -q && \
                     libpcre2-dev \
                     libz-dev \
                     make \
+                    patch \
                     wget
 
 COPY --from=fips-openssl /opt/fips/ssl "${FIPS_OPENSSL_DIR}"
@@ -28,6 +29,10 @@ RUN wget --quiet "${HAPROXY_URL}" && \
     tar -xzf "${HAPROXY_FILENAME}"
 
 WORKDIR "/opt/haproxy/haproxy-${HAPROXY_VERSION}"
+
+# Apply enforcement patch
+COPY 0001-Enforce-FIPS-compliance-at-startup.patch .
+RUN patch -p1 -i ./0001-Enforce-FIPS-compliance-at-startup.patch
 
 RUN make TARGET=linux-glibc \
          USE_LIBCRYPT= \
@@ -41,10 +46,10 @@ RUN make TARGET=linux-glibc \
          SSL_LIB="${FIPS_OPENSSL_DIR}/lib" \
          CC="${FIPS_OPENSSL_DIR}/fips-2.0/bin/fipsld" \
          FIPSLD_CC=gcc \
-         CFLAGS="-O2 -g -fwrapv" \
+         CFLAGS="-O2 -g -w -fwrapv" \
          LDFLAGS="-Wl,-rpath=${FIPS_OPENSSL_DIR}/lib" \
          -j8 && \
     make install
 
-# TODO: Sanity check and bail-out patch application
 # ENV LD_LIBRARY_PATH=/usr/local/ssl/lib
+ENTRYPOINT /usr/local/sbin/haproxy
