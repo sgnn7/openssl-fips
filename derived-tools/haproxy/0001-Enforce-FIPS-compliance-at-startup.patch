@@ -1,0 +1,52 @@
+From 3b1d33d089b53f45458b05a8550ae2638fac87ed Mon Sep 17 00:00:00 2001
+From: Srdjan Grubor <sgnn7@sgnn7.org>
+Date: Fri, 12 Nov 2021 13:56:06 -0600
+Subject: [PATCH] Enforce FIPS compliance at startup
+
+This change ensures that we don't start the HAProxy if we can't ensure
+that the FIPS compliance is working in OpenSSL.
+---
+ src/haproxy.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/src/haproxy.c b/src/haproxy.c
+index 416f28b66..d36dab37e 100644
+--- a/src/haproxy.c
++++ b/src/haproxy.c
+@@ -137,6 +137,7 @@
+ #include <haproxy/uri_auth-t.h>
+ #include <haproxy/vars.h>
+ #include <haproxy/version.h>
++#include <openssl/crypto.h>
+ 
+ 
+ /* array of init calls for older platforms */
+@@ -2871,6 +2872,25 @@ int main(int argc, char **argv)
+ 	RUN_INITCALLS(STG_REGISTER);
+ 	RUN_INITCALLS(STG_INIT);
+ 
++#ifdef USE_OPENSSL
++	if (!FIPS_mode_set(1)) {
++		ha_alert("Error initializing FIPS mode!\n");
++		ERR_load_crypto_strings();
++		ERR_print_errors_fp(stderr);
++		exit(1);
++	}
++
++	int fips_compatible_build = -1;
++	if ((fips_compatible_build = FIPS_mode()) == 0) {
++		ha_alert("The current version of OpenSSL is not FIPS-capable!\n");
++		ERR_load_crypto_strings();
++		ERR_print_errors_fp(stderr);
++		exit(1);
++	}
++
++	ha_warning("*** HAPROXY IS RUNNING IN FIPS MODE ***\n");
++#endif
++
+ 	init(argc, argv);
+ 	signal_register_fct(SIGQUIT, dump, SIGQUIT);
+ 	signal_register_fct(SIGUSR1, sig_soft_stop, SIGUSR1);
+-- 
+2.25.1
+
