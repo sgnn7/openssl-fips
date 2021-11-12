@@ -1,9 +1,9 @@
 FROM docker.io/ubuntu:20.04 as build-container
 
 # v2.4.7 is supported until 2026 q2
-ENV HAPROXY_VERSION="2.4.7"
-# From https://www.haproxy.org/download/2.4/src/haproxy-2.4.7.tar.gz.sha256
-ENV HAPROXY_SHA265="52af97f72f22ffd8a7a995fafc696291d37818feda50a23caef7dc0622421845"
+ENV HAPROXY_VERSION="2.4.8"
+# From https://www.haproxy.org/download/2.4/src/haproxy-2.4.8.tar.gz.sha256
+ENV HAPROXY_SHA265="e3e4c1ad293bc25e8d8790cc5e45133213dda008bfd0228bf3077259b32ebaa5"
 
 ENV HAPROXY_FILENAME="haproxy-${HAPROXY_VERSION}.tar.gz"
 ENV HAPROXY_URL="https://www.haproxy.org/download/2.4/src/${HAPROXY_FILENAME}"
@@ -17,6 +17,7 @@ RUN apt update -q && \
                     libpcre2-dev \
                     libz-dev \
                     make \
+                    patch \
                     wget
 
 COPY --from=fips-openssl /opt/fips/ssl "${FIPS_OPENSSL_DIR}"
@@ -28,6 +29,10 @@ RUN wget --quiet "${HAPROXY_URL}" && \
     tar -xzf "${HAPROXY_FILENAME}"
 
 WORKDIR "/opt/haproxy/haproxy-${HAPROXY_VERSION}"
+
+# Apply enforcement patch
+COPY 0001-Enforce-FIPS-compliance-at-startup.patch .
+RUN patch -p1 -i ./0001-Enforce-FIPS-compliance-at-startup.patch
 
 RUN make TARGET=linux-glibc \
          USE_LIBCRYPT= \
@@ -41,9 +46,10 @@ RUN make TARGET=linux-glibc \
          SSL_LIB="${FIPS_OPENSSL_DIR}/lib" \
          CC="${FIPS_OPENSSL_DIR}/fips-2.0/bin/fipsld" \
          FIPSLD_CC=gcc \
+         CFLAGS="-O2 -g -w -fwrapv" \
          LDFLAGS="-Wl,-rpath=${FIPS_OPENSSL_DIR}/lib" \
-         -j1 && \
+         -j8 && \
     make install
 
-# TODO: Sanity check and bail-out patch application
 # ENV LD_LIBRARY_PATH=/usr/local/ssl/lib
+ENTRYPOINT /usr/local/sbin/haproxy
