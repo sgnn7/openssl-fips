@@ -39,3 +39,8 @@ RUN OPENSSL_FIPS=1 LD_LIBRARY_PATH=/opt/fips/ssl/lib /opt/fips/ssl/bin/openssl v
               echo "MD5 should not be enabled!"; \
               exit 1; \
               fi'
+
+RUN mkdir /dist && \
+    cp *.pc \
+       *.so \
+       *.so.1.0.0 /dist

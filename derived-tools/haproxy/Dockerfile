@@ -51,5 +51,14 @@ RUN make TARGET=linux-glibc \
          -j8 && \
     make install
 
-# ENV LD_LIBRARY_PATH=/usr/local/ssl/lib
+# Runner container
+FROM docker.io/ubuntu:20.04
+
+RUN apt update -q && \
+    apt dist-upgrade -yq
+
+COPY --from=fips-openssl /dist /fips-openssl
+ENV LD_LIBRARY_PATH=/fips-openssl
+
 ENTRYPOINT /usr/local/sbin/haproxy
+COPY --from=build-container /usr/local/sbin/haproxy /usr/local/sbin/haproxy
