@@ -41,8 +41,9 @@ RUN make TARGET=linux-glibc \
          SSL_LIB="${FIPS_OPENSSL_DIR}/lib" \
          CC="${FIPS_OPENSSL_DIR}/fips-2.0/bin/fipsld" \
          FIPSLD_CC=gcc \
+         CFLAGS="-O2 -g -fwrapv" \
          LDFLAGS="-Wl,-rpath=${FIPS_OPENSSL_DIR}/lib" \
-         -j1 && \
+         -j8 && \
     make install
 
 # TODO: Sanity check and bail-out patch application
