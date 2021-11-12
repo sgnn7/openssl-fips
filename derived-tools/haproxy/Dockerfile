@@ -1,9 +1,9 @@
 FROM docker.io/ubuntu:20.04 as build-container
 
 # v2.4.7 is supported until 2026 q2
-ENV HAPROXY_VERSION="2.4.7"
-# From https://www.haproxy.org/download/2.4/src/haproxy-2.4.7.tar.gz.sha256
-ENV HAPROXY_SHA265="52af97f72f22ffd8a7a995fafc696291d37818feda50a23caef7dc0622421845"
+ENV HAPROXY_VERSION="2.4.8"
+# From https://www.haproxy.org/download/2.4/src/haproxy-2.4.8.tar.gz.sha256
+ENV HAPROXY_SHA265="e3e4c1ad293bc25e8d8790cc5e45133213dda008bfd0228bf3077259b32ebaa5"
 
 ENV HAPROXY_FILENAME="haproxy-${HAPROXY_VERSION}.tar.gz"
 ENV HAPROXY_URL="https://www.haproxy.org/download/2.4/src/${HAPROXY_FILENAME}"
