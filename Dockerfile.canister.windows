@@ -1,0 +1,25 @@
+FROM mcr.microsoft.com/windows/servercore:ltsc2019
+
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop';"]
+
+ENV OPENSSL_FIPS_MODULE_VER=2.0.13
+ENV OPENSSL_FIPS_MODULE_FILENAME="OpenSSL_${OPENSSL_FIPS_MODULE_VER}_OracleFIPS_1.0.tar.gz"
+ENV OPENSSL_FIPS_MODULE_HMAC_SHA1="ef8f7a91979cad14d033d8803a89fdf925102a30"
+ENV OPENSSL_FIPS_MODULE_HMAC_KEY="etaonrishdlcupfm"
+
+ARG OPENSSL_VER=1.0.2o
+
+ENV CYGWIN=winsymlinks
+RUN Invoke-WebRequest -Uri 'https://cygwin.com/setup-x86_64.exe' -OutFile 'C:/setup-x86_64.exe'; \
+    New-Item -ItemType directory -Path 'C:/tmp'; \
+    Start-Process "C:/setup-x86_64.exe" -NoNewWindow -Wait -PassThru -ArgumentList @('-q','-v','-n','-B','-R','C:/cygwin64','-l','C:/tmp','-s','https://mirrors.kernel.org/sourceware/cygwin/','-P','default'); \
+    Remove-Item -Path 'C:/tmp' -Force -Recurse -ErrorAction Ignore; \
+    Start-Process "C:/cygwin64/bin/cygcheck.exe" -NoNewWindow -Wait -PassThru -ArgumentList @('-c')
+CMD ["C:/cygwin64/bin/bash.exe"]
+
+RUN Invoke-WebRequest -Uri "https://github.com/oracle/solaris-openssl-fips/releases/download/v1.0/$env:OPENSSL_FIPS_MODULE_FILENAME" -OutFile "C:/$env:OPENSSL_FIPS_MODULE_FILENAME"; \
+    $hmacsha = New-Object System.Security.Cryptography.HMACSHA1; \
+    $hmacsha.key = [Text.Encoding]::ASCII.GetBytes($env:OPENSSL_FIPS_MODULE_HMAC_KEY); \
+    $signature = $hmacsha.ComputeHash([io.File]::ReadAllBytes($('C:/{0}' -f $env:OPENSSL_FIPS_MODULE_FILENAME))); \
+    $hexSignature = ($signature|ForEach-Object ToString X2) -join '' ; \
+    if ($hexSignature.ToLower() -ne $env:OPENSSL_FIPS_MODULE_HMAC_SHA1) { throw 'Checksum mismatch!' }
