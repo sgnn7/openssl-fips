@@ -21,7 +21,7 @@ RUN wget --quiet "https://www.openssl.org/source/${OPENSSL_FILENAME}" && \
 
 WORKDIR "openssl-${OPENSSL_VER}"
 
-COPY --from=fips-canister /usr/local/ssl /opt/fips/ssl
+COPY --from=fips-canister-linux /usr/local/ssl /opt/fips/ssl
 
 RUN ./config \
       --prefix=/opt/fips/ssl \

@@ -20,7 +20,7 @@ RUN apt update -q && \
                     patch \
                     wget
 
-COPY --from=fips-openssl /opt/fips/ssl "${FIPS_OPENSSL_DIR}"
+COPY --from=fips-openssl-linux /opt/fips/ssl "${FIPS_OPENSSL_DIR}"
 
 RUN wget --quiet "${HAPROXY_URL}" && \
     bash -ec "set -euo pipefail; \
@@ -57,7 +57,7 @@ FROM docker.io/ubuntu:20.04
 RUN apt update -q && \
     apt dist-upgrade -yq
 
-COPY --from=fips-openssl /dist /fips-openssl
+COPY --from=fips-openssl-linux /dist /fips-openssl
 ENV LD_LIBRARY_PATH=/fips-openssl
 
 ENTRYPOINT [ "/usr/local/sbin/haproxy" ]
