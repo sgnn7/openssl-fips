@@ -2,6 +2,13 @@
 
 set -euo pipefail
 
-echo "Building the OpenSSL..."
-sudo docker build -t fips-openssl -f Dockerfile.openssl .
-echo "Building the OpenSSL: OK"
+docker_cmd=("sudo" "docker")
+if docker ps &>/dev/null; then
+  docker_cmd=("docker")
+fi
+
+echo "Building the OpenSSL container..."
+
+"${docker_cmd[@]}" build -t fips-openssl -f Dockerfile.openssl .
+
+echo "Building the OpenSSL container: OK"
