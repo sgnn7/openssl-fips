@@ -3,53 +3,108 @@ FROM mcr.microsoft.com/windows/servercore:20H2
 
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop';"]
 
-ENV OPENSSL_FIPS_MODULE_VER=2.0.13
-ENV OPENSSL_FIPS_MODULE_FILENAME="OpenSSL_${OPENSSL_FIPS_MODULE_VER}_OracleFIPS_1.0.tar.gz"
-ENV OPENSSL_FIPS_MODULE_HMAC_SHA1="ef8f7a91979cad14d033d8803a89fdf925102a30"
-ENV OPENSSL_FIPS_MODULE_HMAC_KEY="etaonrishdlcupfm"
+ENV OPENSSL_FIPS_MODULE_FILENAME="OpenSSL_2.0.13_OracleFIPS_1.0.tar.gz" \
+    OPENSSL_FIPS_MODULE_HMAC_SHA1="ef8f7a91979cad14d033d8803a89fdf925102a30" \
+    OPENSSL_FIPS_MODULE_HMAC_KEY="etaonrishdlcupfm" \
+    \
+    MSYS2_VER="20211130" \
+    MSYS2_SHA256="cad07ef0ae2492006c9457b26806351607f168c2fb6a71cd002223c2c395bfc7" \
+    \
+    7ZIP_VER="2106" \
+    7ZIP_SHA256="7e7436175b708d60816b186b7afb72f2f000334a77e7636460630c895b2a75ff"
 
-ARG OPENSSL_VER=1.0.2o
-
-# Ensure that Cygwin doesn't try to use hard-links
-ENV CYGWIN=winsymlinks
-
-# Install Cygwin with required pacakges
-RUN Invoke-WebRequest -Uri 'https://cygwin.com/setup-x86_64.exe' \
-                      -OutFile 'C:/setup-x86_64.exe'; \
+RUN New-Item -ItemType directory \
+             -Path 'C:/tools'; \
     New-Item -ItemType directory \
-             -Path 'C:/tmp'; \
-    Start-Process "C:/setup-x86_64.exe" -NoNewWindow \
-                                        -Wait \
-                                        -PassThru \
-                                        -ArgumentList @('-q','-v','-n','-B','-R','C:/cygwin64','-l','C:/tmp','-s','https://mirrors.kernel.org/sourceware/cygwin/','-P','tar,sed,awk,grep,expr,perl,gcc-core'); \
-    Remove-Item -Path 'C:/tmp' \
-                -Force \
-                -Recurse \
-                -ErrorAction Ignore; \
-    Start-Process "C:/cygwin64/bin/cygcheck.exe" -NoNewWindow \
-                                                 -Wait \
-                                                 -PassThru \
-                                                 -ArgumentList @('-c')
+             -Path 'C:/tmp'
 
-# Fix path so that Cygwin binaries are available in Cygwin shell
-RUN $path = $env:path + ';C:/cygwin64/bin'; \
+RUN Write-Host -ForegroundColor Green $('Downloading 7zip v{0}...' -f $env:7ZIP_VER); \
+    (New-Object System.Net.WebClient).DownloadFile($('https://www.7-zip.org/a/7z{0}-x64.exe' -f $env:7ZIP_VER), 'C:/tmp/7zip.exe'); \
+    \
+    Write-Host -ForegroundColor Green 'Calculating checksum...'; \
+    $hash = Get-FileHash 'C:/tmp/7zip.exe' -Algorithm 'SHA256'; \
+    if ($hash.Hash.ToLower() -ne $env:7ZIP_SHA256) { throw $('Checksum mismatch (7zip)! Expected {0}, got {1}!' -f $hash,$env:7ZIP_SHA256) }; \
+    \
+    Write-Host -ForegroundColor Green 'Installing...'; \
+    Start-Process 'C:/tmp/7zip.exe' -NoNewWindow \
+                                    -Wait \
+                                    -PassThru \
+                                    -ArgumentList '/S'; \
+    \
+    Write-Host -ForegroundColor Green 'Cleaning up...'; \
+    Remove-Item -Path 'C:/tmp/7zip.exe' \
+                -Force \
+                -ErrorAction Ignore
+
+# Fix path so that 7zip binaries are available
+RUN $path = $('{0};C:/program files/7-zip' -f $env:path); \
     Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment\' \
                      -Name Path \
                      -Value $path
-CMD ["C:/cygwin64/bin/bash.exe"]
+
+# Install MSYS2 with required packages
+RUN Write-Host -ForegroundColor Green $('Downloading MSYS2 v{0}...' -f $env:MSYS2_VER); \
+    (New-Object System.Net.WebClient).DownloadFile($('http://repo.msys2.org/distrib/x86_64/msys2-base-x86_64-{0}.tar.xz' -f $env:MSYS2_VER), 'C:/tmp/msys2.tar.xz'); \
+    \
+    Write-Host -ForegroundColor Green 'Verifying checksum...'; \
+    $hash = Get-FileHash 'C:/tmp/msys2.tar.xz' -Algorithm 'SHA256'; \
+    if ($hash.Hash.ToLower() -ne $env:MSYS2_SHA256) { throw $('Checksum mismatch (MSYS2)! Expected {0}, got {1}!' -f $hash,$env:MSYS2_SHA256) }; \
+    \
+    Write-Host -ForegroundColor Green 'Extracting (1/2)...'; \
+    Start-Process '7z' -NoNewWindow \
+                       -Wait \
+                       -PassThru \
+                       -ArgumentList @('x','C:/tmp/msys2.tar.xz', $('-o{0}' -f 'C:/tmp')); \
+    Write-Host -ForegroundColor Green 'Extracting (2/2)...'; \
+    Start-Process '7z' -NoNewWindow \
+                       -Wait \
+                       -PassThru \
+                       -ArgumentList @('x','C:/tmp/msys2.tar', $('-o{0}' -f 'C:/tools')); \
+    \
+    Write-Host -ForegroundColor Green 'Cleaning up...'; \
+    Remove-Item -Path 'C:/tmp/msys2.tar.xz' \
+                -Force \
+                -ErrorAction Ignore ; \
+    Remove-Item -Path 'C:/tmp/msys2.tar' \
+                -Force \
+                -ErrorAction Ignore
+
+# Fix path so that MSYS2 binaries are available in the shell
+RUN $path = $env:path + ';C:/tools/msys64/usr/bin'; \
+    Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment\' \
+                     -Name Path \
+                     -Value $path
+CMD ["C:/tools/msys64/usr/bin/bash.exe"]
+
+RUN Write-Host -ForegroundColor Green 'Fetching dependencies...'; \
+    Start-Process "C:/tools/msys64/usr/bin/bash.exe" -NoNewWindow \
+                                                     -Wait \
+                                                     -PassThru \
+                                                     -ArgumentList @('-ec','pacman-key --init'); \
+    Start-Process "C:/tools/msys64/usr/bin/bash.exe" -NoNewWindow \
+                                                     -Wait \
+                                                     -PassThru \
+                                                     -ArgumentList @('-ec','pacman-key --populate msys2')
+    Start-Process "C:/tools/msys64/usr/bin/bash.exe" -NoNewWindow \
+                                                     -Wait \
+                                                     -PassThru \
+                                                     -ArgumentList @('-ec','pacman -Sy --noconfirm --noprogressbar base-devel gcc')
 
 # Download the FIPS canister source
-RUN Invoke-WebRequest -Uri "https://github.com/oracle/solaris-openssl-fips/releases/download/v1.0/$env:OPENSSL_FIPS_MODULE_FILENAME" \
-                      -OutFile "C:/$env:OPENSSL_FIPS_MODULE_FILENAME"; \
+RUN Write-Host -ForegroundColor Green $('Downloading FIPS module v{0}...' -f $env:OPENSSL_FIPS_MODULE_FILENAME); \
+    (New-Object System.Net.WebClient).DownloadFile($('https://github.com/oracle/solaris-openssl-fips/releases/download/v1.0/{0}' -f $env:OPENSSL_FIPS_MODULE_FILENAME), $('C:/tmp/{0}' -f $env:OPENSSL_FIPS_MODULE_FILENAME)); \
+    \
+    Write-Host -ForegroundColor Green 'Verifying checksum...'; \
     $hmacsha = New-Object System.Security.Cryptography.HMACSHA1; \
     $hmacsha.key = [Text.Encoding]::ASCII.GetBytes($env:OPENSSL_FIPS_MODULE_HMAC_KEY); \
-    $signature = $hmacsha.ComputeHash([io.File]::ReadAllBytes($('C:/{0}' -f $env:OPENSSL_FIPS_MODULE_FILENAME))); \
+    $signature = $hmacsha.ComputeHash([io.File]::ReadAllBytes($('C:/tmp/{0}' -f $env:OPENSSL_FIPS_MODULE_FILENAME))); \
     $hexSignature = ($signature|ForEach-Object ToString X2) -join '' ; \
     if ($hexSignature.ToLower() -ne $env:OPENSSL_FIPS_MODULE_HMAC_SHA1) { throw 'Checksum mismatch!' }
 
 # Build the canister
+ENV SYSTEM="mingw64"
 COPY canister_extract_and_build.sh /
-RUN Start-Process "C:/cygwin64/bin/bash.exe" -NoNewWindow \
-                                             -Wait \
-                                             -PassThru \
-                                             -ArgumentList @('-ec','/cygdrive/c/canister_extract_and_build.sh')
+RUN Start-Process "C:/tools/msys64/usr/bin/bash.exe" -NoNewWindow \
+                                                     -Wait \
+                                                     -PassThru \
+                                                     -ArgumentList @('-ec','cd /c/tmp && /c/canister_extract_and_build.sh')
