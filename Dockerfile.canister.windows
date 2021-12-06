@@ -67,28 +67,26 @@ RUN Write-Host -ForegroundColor Green $('Downloading MSYS2 v{0}...' -f $env:MSYS
                 -ErrorAction Ignore ; \
     Remove-Item -Path 'C:/tmp/msys2.tar' \
                 -Force \
-                -ErrorAction Ignore
+                -ErrorAction Ignore; \
+    Write-Host -ForegroundColor Green 'Fixing MSYS2 keyring...'; \
+    Start-Process "C:/tools/msys64/usr/bin/bash.exe" -NoNewWindow \
+                                                     -Wait \
+                                                     -PassThru \
+                                                     -ArgumentList @('-lec','echo Done')
 
 # Fix path so that MSYS2 binaries are available in the shell
-RUN $path = $env:path + ';C:/tools/msys64/usr/bin'; \
+RUN $path = $env:path + ';C:/tools/msys64/bin;C:/tools/msys64/mingw64/bin;C:/tools/msys64/usr/bin'; \
     Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment\' \
                      -Name Path \
                      -Value $path
 CMD ["C:/tools/msys64/usr/bin/bash.exe"]
 
-RUN Write-Host -ForegroundColor Green 'Fetching dependencies...'; \
-    Start-Process "C:/tools/msys64/usr/bin/bash.exe" -NoNewWindow \
-                                                     -Wait \
-                                                     -PassThru \
-                                                     -ArgumentList @('-ec','pacman-key --init'); \
-    Start-Process "C:/tools/msys64/usr/bin/bash.exe" -NoNewWindow \
-                                                     -Wait \
-                                                     -PassThru \
-                                                     -ArgumentList @('-ec','pacman-key --populate msys2')
-    Start-Process "C:/tools/msys64/usr/bin/bash.exe" -NoNewWindow \
-                                                     -Wait \
-                                                     -PassThru \
-                                                     -ArgumentList @('-ec','pacman -Sy --noconfirm --noprogressbar base-devel gcc')
+RUN Write-Host -ForegroundColor Green 'Installing MSYS2 dependencies...'; \
+    $proc = Start-Process "C:/tools/msys64/usr/bin/pacman.exe" -NoNewWindow \
+                                                               -Wait \
+                                                               -PassThru \
+                                                               -ArgumentList @('-Sy --noconfirm --noprogressbar base-devel mingw-w64-x86_64-toolchain mingw-w64-x86_64-dlfcn'); \
+    if ($proc.ExitCode) { throw ('MSYS2 dependency install failed: 0x{0:x}' -f $proc.ExitCode) }
 
 # Download the FIPS canister source
 RUN Write-Host -ForegroundColor Green $('Downloading FIPS module v{0}...' -f $env:OPENSSL_FIPS_MODULE_FILENAME); \
@@ -104,7 +102,8 @@ RUN Write-Host -ForegroundColor Green $('Downloading FIPS module v{0}...' -f $en
 # Build the canister
 ENV SYSTEM="mingw64"
 COPY canister_extract_and_build.sh /
-RUN Start-Process "C:/tools/msys64/usr/bin/bash.exe" -NoNewWindow \
-                                                     -Wait \
-                                                     -PassThru \
-                                                     -ArgumentList @('-ec','cd /c/tmp && /c/canister_extract_and_build.sh')
+RUN $proc = Start-Process "C:/tools/msys64/usr/bin/bash.exe" -NoNewWindow \
+                                                             -Wait \
+                                                             -PassThru \
+                                                             -ArgumentList \"-ec \"\"cd /c/tmp && /c/canister_extract_and_build.sh\"\"\"; \
+     if ($proc.ExitCode) { throw ('Canister build failed: 0x{0:x}' -f $proc.ExitCode) }
