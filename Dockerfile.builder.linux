@@ -1,0 +1,10 @@
+FROM docker.io/ubuntu:20.04
+
+WORKDIR /
+
+RUN apt update -q && \
+    apt install -qy coreutils \
+                    gcc \
+                    make \
+                    libdata-compare-perl \
+                    wget

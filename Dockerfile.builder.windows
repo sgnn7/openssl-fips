@@ -1,0 +1,100 @@
+FROM mcr.microsoft.com/windows/servercore:20H2
+# FROM mcr.microsoft.com/windows/servercore:ltsc2019
+
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop';"]
+
+ENV MSYS2_VER="20211130" \
+    MSYS2_SHA256="cad07ef0ae2492006c9457b26806351607f168c2fb6a71cd002223c2c395bfc7" \
+    \
+    7ZIP_VER="2106" \
+    7ZIP_SHA256="7e7436175b708d60816b186b7afb72f2f000334a77e7636460630c895b2a75ff"
+
+RUN New-Item -ItemType directory \
+             -Path 'C:/tools'; \
+    New-Item -ItemType directory \
+             -Path 'C:/tmp'
+
+RUN Write-Host -ForegroundColor Green $('Downloading 7zip v{0}...' -f $env:7ZIP_VER); \
+    (New-Object System.Net.WebClient).DownloadFile($('https://www.7-zip.org/a/7z{0}-x64.exe' -f $env:7ZIP_VER), 'C:/tmp/7zip.exe'); \
+    \
+    Write-Host -ForegroundColor Green 'Calculating checksum...'; \
+    $hash = Get-FileHash 'C:/tmp/7zip.exe' -Algorithm 'SHA256'; \
+    if ($hash.Hash.ToLower() -ne $env:7ZIP_SHA256) { throw $('Checksum mismatch (7zip)! Expected {0}, got {1}!' -f $hash,$env:7ZIP_SHA256) }; \
+    \
+    Write-Host -ForegroundColor Green 'Installing...'; \
+    Start-Process 'C:/tmp/7zip.exe' -NoNewWindow \
+                                    -Wait \
+                                    -PassThru \
+                                    -ArgumentList '/S'; \
+    \
+    Write-Host -ForegroundColor Green 'Cleaning up...'; \
+    Remove-Item -Path 'C:/tmp/7zip.exe' \
+                -Force \
+                -ErrorAction Ignore
+
+# Fix path so that 7zip binaries are available
+RUN $path = $('{0};C:/program files/7-zip' -f $env:path); \
+    Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment\' \
+                     -Name Path \
+                     -Value $path
+
+# Install MSYS2 with required packages
+RUN Write-Host -ForegroundColor Green $('Downloading MSYS2 v{0}...' -f $env:MSYS2_VER); \
+    (New-Object System.Net.WebClient).DownloadFile($('http://repo.msys2.org/distrib/x86_64/msys2-base-x86_64-{0}.tar.xz' -f $env:MSYS2_VER), 'C:/tmp/msys2.tar.xz'); \
+    \
+    Write-Host -ForegroundColor Green 'Verifying checksum...'; \
+    $hash = Get-FileHash 'C:/tmp/msys2.tar.xz' -Algorithm 'SHA256'; \
+    if ($hash.Hash.ToLower() -ne $env:MSYS2_SHA256) { throw $('Checksum mismatch (MSYS2)! Expected {0}, got {1}!' -f $hash,$env:MSYS2_SHA256) }; \
+    \
+    Write-Host -ForegroundColor Green 'Extracting (1/2)...'; \
+    Start-Process '7z' -NoNewWindow \
+                       -Wait \
+                       -PassThru \
+                       -ArgumentList @('x','C:/tmp/msys2.tar.xz', $('-o{0}' -f 'C:/tmp')); \
+    Write-Host -ForegroundColor Green 'Extracting (2/2)...'; \
+    Start-Process '7z' -NoNewWindow \
+                       -Wait \
+                       -PassThru \
+                       -ArgumentList @('x','C:/tmp/msys2.tar', $('-o{0}' -f 'C:/tools')); \
+    \
+    Write-Host -ForegroundColor Green 'Cleaning up...'; \
+    Remove-Item -Path 'C:/tmp/msys2.tar.xz' \
+                -Force \
+                -ErrorAction Ignore ; \
+    Remove-Item -Path 'C:/tmp/msys2.tar' \
+                -Force \
+                -ErrorAction Ignore; \
+    Write-Host -ForegroundColor Green 'Fixing MSYS2 keyring...'; \
+    Start-Process "C:/tools/msys64/usr/bin/bash.exe" -NoNewWindow \
+                                                     -Wait \
+                                                     -PassThru \
+                                                     -ArgumentList @('-lec','echo Done')
+
+# Fix path so that MSYS2 binaries are available in the shell
+RUN $path = $env:path + ';C:/tools/msys64/bin;C:/tools/msys64/mingw64/bin;C:/tools/msys64/usr/bin'; \
+    Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment\' \
+                     -Name Path \
+                     -Value $path
+CMD ["C:/tools/msys64/usr/bin/bash.exe"]
+
+RUN Write-Host -ForegroundColor Green 'Installing MSYS2 dependencies...'; \
+    $proc = Start-Process "C:/tools/msys64/usr/bin/pacman.exe" -NoNewWindow \
+                                                               -Wait \
+                                                               -PassThru \
+                                                               -ArgumentList @('-Sy --noconfirm --noprogressbar base-devel mingw-w64-x86_64-toolchain mingw-w64-x86_64-dlfcn'); \
+    if ($proc.ExitCode) { throw ('MSYS2 dependency install failed: 0x{0:x}' -f $proc.ExitCode) }
+
+# Temporary workaround for https://github.com/msys2/MINGW-packages/issues/10295
+RUN Write-Host -ForegroundColor Green 'Installing MSYS2 older GCC...'; \
+    $pkgs = $('https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-gcc-11.2.0-2-any.pkg.tar.zst', \
+              'https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-gcc-ada-11.2.0-2-any.pkg.tar.zst', \
+              'https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-gcc-fortran-11.2.0-2-any.pkg.tar.zst', \
+              'https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-gcc-libgfortran-11.2.0-2-any.pkg.tar.zst', \
+              'https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-gcc-libs-11.2.0-2-any.pkg.tar.zst', \
+              'https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-gcc-objc-11.2.0-2-any.pkg.tar.zst', \
+              'https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-libgccjit-11.2.0-2-any.pkg.tar.zst'); \
+    $proc = Start-Process "C:/tools/msys64/usr/bin/pacman.exe" -NoNewWindow \
+                                                               -Wait \
+                                                               -PassThru \
+                                                               -ArgumentList @($('-U --noconfirm --noprogressbar {0}' -f ($pkgs -join ' '))); \
+    if ($proc.ExitCode) { throw ('MSYS2 dependency install failed: 0x{0:x}' -f $proc.ExitCode) }

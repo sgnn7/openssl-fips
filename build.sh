@@ -4,6 +4,7 @@ set -euo pipefail
 
 echo "Building..."
 
+./build_fips_builder.sh
 ./build_fips_canister.sh
 ./build_fips_openssl.sh
 
