@@ -4,17 +4,22 @@ set -euo pipefail
 
 echo "Building..."
 
-./build_fips_builder.sh
-./build_fips_canister.sh
-./build_fips_openssl.sh
+BUILD_ORDER=( "builder"
+              "canister"
+              "openssl" )
 
-if [ ! -z "${1:-}" ]; then
+for step in "${BUILD_ORDER[@]}"; do
+  "./build_fips_${step}.sh"
+done
+
+if [ -n "${1:-}" ]; then
   tool_name="$1"
   echo
   echo "Requested building of ${tool_name}..."
 
-  cd "derived-tools/$1"
-  ./build.sh
+  pushd "derived-tools/$1" >/dev/null
+    ./build.sh
+  popd
 fi
 
 echo "Build completed!"

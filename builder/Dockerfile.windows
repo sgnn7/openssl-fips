@@ -70,8 +70,9 @@ RUN Write-Host -ForegroundColor Green $('Downloading MSYS2 v{0}...' -f $env:MSYS
                                                      -PassThru \
                                                      -ArgumentList @('-lec','echo Done')
 
-# Fix path so that MSYS2 binaries are available in the shell
-RUN $path = $env:path + ';C:/tools/msys64/bin;C:/tools/msys64/mingw64/bin;C:/tools/msys64/usr/bin'; \
+# Fix path so that MSYS2 binaries are available in the shell. We also ensure
+# that MSYS2 binaries are preferred by prepending them to the path.
+RUN $path = 'C:/tools/msys64/bin;C:/tools/msys64/mingw64/bin;C:/tools/msys64/usr/bin;' + $env:path; \
     Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment\' \
                      -Name Path \
                      -Value $path

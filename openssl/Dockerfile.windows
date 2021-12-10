@@ -1,0 +1,16 @@
+FROM fips-builder-windows
+
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop';"]
+
+# Get our canister files to the right location
+COPY --from=fips-canister-windows C:/usr/local/ssl C:/opt/fips/ssl
+
+# Build OpensSSL
+ENV SYSTEM="mingw64"
+COPY openssl_extract_and_build.sh /
+
+RUN $proc = Start-Process "C:/tools/msys64/usr/bin/bash.exe" -NoNewWindow \
+                                                             -Wait \
+                                                             -PassThru \
+                                                             -ArgumentList \"-ec \"\"cd /c/tmp && /c/openssl_build.sh\"\"\"; \
+     if ($proc.ExitCode) { throw ('OpenSSL build failed: 0x{0:x}' -f $proc.ExitCode) }

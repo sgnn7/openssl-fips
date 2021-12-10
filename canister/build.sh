@@ -16,11 +16,19 @@ if [[ $(docker info --format '{{json .}}' | jq -r .Driver) == "windowsfilter" ]]
   container_name_suffix="windows"
 fi
 
-echo "Building FIPS HAProxy container..."
+# Check that we have the builder image available
+if ! docker image inspect "fips-builder-${container_name_suffix}" &>/dev/null; then
+  echo "WARN: Builder image not found! Building..."
+  pushd .. >/dev/null
+    ./build_fips_builder.sh "$@"
+  popd
+fi
+
+echo "Building the OpenSSL canister container..."
 
 "${docker_cmd[@]}" build \
-  -t "fips-haproxy-${container_name_suffix}" \
+  -t "fips-canister-${container_name_suffix}" \
   -f "Dockerfile.${container_name_suffix}" \
   .
 
-echo "Building FIPS HAProxy container: OK"
+echo "Building the OpenSSL canister container: OK"

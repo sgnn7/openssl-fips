@@ -1,0 +1,9 @@
+FROM fips-builder-linux as builder-linux
+
+COPY canister_build.sh /
+RUN chmod +x /canister_build.sh && \
+    /canister_build.sh
+
+FROM scratch
+COPY --from=builder-linux /usr/local/ssl /usr/local/ssl
+COPY --from=builder-linux "/${OPENSSL_FIPS_MODULE_FILENAME}" /

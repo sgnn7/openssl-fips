@@ -1,0 +1,12 @@
+FROM fips-builder-windows
+
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop';"]
+
+# Build the canister
+ENV SYSTEM="mingw64"
+COPY canister_build.sh /
+RUN $proc = Start-Process "C:/tools/msys64/usr/bin/bash.exe" -NoNewWindow \
+                                                             -Wait \
+                                                             -PassThru \
+                                                             -ArgumentList \"-ec \"\"cd /c/tmp && /c/canister_build.sh\"\"\"; \
+     if ($proc.ExitCode) { throw ('Canister build failed: 0x{0:x}' -f $proc.ExitCode) }

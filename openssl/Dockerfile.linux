@@ -1,0 +1,16 @@
+FROM fips-builder-linux
+
+COPY --from=fips-canister-linux /usr/local/ssl /opt/fips/ssl
+
+COPY ./openssl_build.sh /
+RUN chmod +x ./openssl_build.sh && \
+    ./openssl_build.sh
+
+# Sanity check
+# TODO: Move to shell script
+RUN OPENSSL_FIPS=1 LD_LIBRARY_PATH=/opt/fips/ssl/lib /opt/fips/ssl/bin/openssl version && \
+    bash -ec 'openssl md5 /openssl_build.sh >/dev/null' && \
+    bash -ec 'if OPENSSL_FIPS=1 LD_LIBRARY_PATH=/opt/fips/ssl/lib /opt/fips/ssl/bin/openssl md5 /openssl_build.sh 2>/dev/null; then \
+              echo "MD5 should not be enabled!"; \
+              exit 1; \
+              fi'

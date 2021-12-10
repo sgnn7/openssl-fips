@@ -16,11 +16,11 @@ if [[ $(docker info --format '{{json .}}' | jq -r .Driver) == "windowsfilter" ]]
   container_name_suffix="windows"
 fi
 
-echo "Building FIPS HAProxy container..."
+echo "Building the builder tooling container..."
 
 "${docker_cmd[@]}" build \
-  -t "fips-haproxy-${container_name_suffix}" \
+  -t "fips-builder-${container_name_suffix}" \
   -f "Dockerfile.${container_name_suffix}" \
   .
 
-echo "Building FIPS HAProxy container: OK"
+echo "Building the builder tooling container: OK"
