@@ -11,6 +11,11 @@ version with containerized (aka reproducible) results. HAProxy is also
 provided as an example of a derivative container that can then be built
 with this as a FIPS-compliant application.
 
+## Pre-requisites
+
+- `jq`
+- `docker`
+
 ## Usage
 
 ```sh-session
