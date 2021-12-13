@@ -2,6 +2,8 @@ FROM fips-builder-linux as builder-linux
 
 COPY canister_build.sh /
 RUN chmod +x /canister_build.sh && \
+    # https://github.com/moby/moby/issues/9547
+    sleep 1 && \
     /canister_build.sh
 
 FROM scratch

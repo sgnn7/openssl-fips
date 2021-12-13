@@ -4,6 +4,8 @@ COPY --from=fips-canister-linux /usr/local/ssl /opt/fips/ssl
 
 COPY ./openssl_build.sh /
 RUN chmod +x ./openssl_build.sh && \
+    # https://github.com/moby/moby/issues/9547
+    sleep 1 && \
     ./openssl_build.sh
 
 # Sanity check
