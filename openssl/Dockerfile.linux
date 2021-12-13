@@ -16,3 +16,7 @@ RUN OPENSSL_FIPS=1 LD_LIBRARY_PATH=/opt/fips/ssl/lib /opt/fips/ssl/bin/openssl v
               echo "MD5 should not be enabled!"; \
               exit 1; \
               fi'
+
+COPY ./verify_openssl_fips_mode.c /
+RUN gcc verify_openssl_fips_mode.c -Wall -ansi -I/opt/fips/ssl/include -L/opt/fips/ssl/lib -lcrypto -o verify_openssl_fips_mode && \
+    LD_LIBRARY_PATH=/opt/fips/ssl/lib ./verify_openssl_fips_mode
